@@ -117,7 +117,7 @@ class PDControlPolicy:
         return torque
 
     def compute_pd_control_torques(
-        self, desired_position, current_position, current_velocity, kp=None, kd=None
+        self, observation, desired_position, kp=None, kd=None
     ):
         """
         Compute torque command to reach given target position using a PD
@@ -134,7 +134,13 @@ class PDControlPolicy:
             List of torques to be sent to the joints of the finger in order to
             reach the specified joint_positions.
         """
+        current_position = observation["robot_observation"]["position"]
+        current_velocity = observation["robot_observation"]["velocity"]
         position_error = desired_position - current_position
+        if kp is None:
+            kp = self.position_gains
+        if kd is None:
+            kd = self.velocity_gains
 
         position_feedback = np.asarray(kp) * position_error
         velocity_feedback = np.asarray(kd) * current_velocity
@@ -239,29 +245,25 @@ class PDControlPolicy:
             3, 3
         )  # np.where(np.abs(error) > 0.10, step / (step + 1), 0.1)
         self._integral = error * self.ki + self._integral * integral_weight
-        if self.step_count % 50 == 0:
-            gymlogger.debug(
-                "Des force: %s,\n obs force: %s,\n error: %s\n",
-                self._des_tip_force,
-                obs_tip_force,
-                error,
-            )
         tip_forces_of, tip_forces_wf = self.compute_tip_forces(des_wrench)
         tip_forces_wf = np.clip(self._integral + self._des_tip_force, -1.5, 1.5)
         return tip_forces_wf
 
     def ik_move(
         self,
-        current_position,
-        current_ft_pos,
+        observation,
         ft_goal,
         interp_n,
         tol=0.006,
         max_steps=500,
     ):
+        current_position = observation["robot_observation"]["position"]
+        # current_ft_pos = self.kinematics.forward_kinematics(current_position)
         assert self.action_space.contains("position")
         # TODO: tol currently hardcoded to 0.001, make it smaller and a variable
-        q = self.kinematics.inverse_kinematics_three_fingers(ft_goal, current_position)
+        q = self.kinematics.inverse_kinematics(
+            ft_goal, current_position, tolerance=tol, max_iterations=max_steps
+        )
         return q
 
     def control(self, mode, observation):
@@ -276,14 +278,17 @@ class PDControlPolicy:
         if mode == "off":
             pass
         if mode == "safe":
-            return self.position_control(observation, safe_pos)
+            return self.tip_position_control(observation, safe_pos)
         if mode == "pos":
-            return self.position_control(observation, grasp_points)
+            return self.tip_position_control(observation, grasp_points)
         if mode == "vel":
             # move radially in along xy plane
             return self.vel_control_force_limit(
                 observation, grasp_points, grasp_normals
             )
+        if mode == "ik":
+            desired_position = self.ik_move(observation, grasp_points)
+            return self.compute_pd_control_torques(observation, desired_position)
         if mode == "up":
             # TODO: Add nerf
             # if self.use_grad_est:
@@ -314,7 +319,7 @@ class PDControlPolicy:
 
     @staticmethod
     def set_mode(t):
-        if t < 500:
+        if t < 0:  # make 500 to test gravity comp
             # fingers need to compensate for gravity and hold tip positions:
             mode = "off"  # Box needs this to get ot graps position
         elif t < 1000:
@@ -339,10 +344,10 @@ class PDControlPolicy:
         if t % 100 == 0:
             print(t, mode)
 
-        if t > 500:
+        if mode != "off":
             # get joint torques for finger 0 to move its tip to the goal position
             self.joint_torques = self.control(mode, observation)
-            self.joint_torques += self.gravity_comp(observation)
+            # self.joint_torques += self.gravity_comp(observation)
             self.joint_torques = self.clip_to_space(self.joint_torques)
         else:
             self.joint_torques = self.gravity_comp(observation)
