@@ -8,7 +8,7 @@ import json
 import sys
 
 from rrc_example_package import cube_trajectory_env
-from rrc_example_package.example import PointAtTrajectoryPolicy
+from rrc_example_package.pd_control import PDControlPolicy
 
 
 class RandomPolicy:
@@ -28,12 +28,13 @@ def main():
 
     env = cube_trajectory_env.RealRobotCubeTrajectoryEnv(
         goal,
-        cube_trajectory_env.ActionType.POSITION,
+        cube_trajectory_env.ActionType.TORQUE,
         step_size=1,
     )
 
     # policy = RandomPolicy(env.action_space)
-    policy = PointAtTrajectoryPolicy(env.action_space, goal)
+    # policy = PointAtTrajectoryPolicy(env.action_space, goal)
+    policy = PDControlPolicy(env.action_space, goal)
 
     observation = env.reset()
     t = 0

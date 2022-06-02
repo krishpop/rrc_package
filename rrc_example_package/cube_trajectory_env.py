@@ -5,7 +5,11 @@ import typing
 import gym
 import numpy as np
 
-import robot_fingers
+try:
+    import robot_fingers
+except ImportError:
+    robot_fingers = None 
+    print("ROS not imported, testing mode")
 import trifinger_simulation
 import trifinger_simulation.visual_objects
 from trifinger_simulation import trifingerpro_limits
