@@ -29,12 +29,7 @@ def main():
 
     while not is_done:
         action = policy.predict(observation, t)
-        try:
-            observation, reward, is_done, info = env.step(action)
-        except:
-            import pdb
-
-            pdb.set_trace()
+        observation, reward, is_done, info = env.step(action)
         t = info["time_index"]
 
 

@@ -109,24 +109,25 @@ class PDControlPolicy:
         angular_vel = dtheta / self.dt
         return vel, angular_vel
 
-    def compute_fingertip_forces(self, tip_forces_wf):
+    def fingertip_force_controller(self, tip_forces_wf):
+        """Controller returns joint torques to achieve desired fingertip forces"""
         tip_forces_wf = tip_forces_wf.reshape(3, 3)
         torque = np.zeros(9)
         for tip_force, Ji in zip(tip_forces_wf, self.tip_jacobians):
             torque += np.squeeze(Ji[:3, :].T @ tip_force)
         return torque
 
-    def compute_pd_control_torques(
-        self, observation, desired_position, kp=None, kd=None
+    def position_pd_control(
+        self, observation, tip_positions=None, joint_positions=None, kp=None, kd=None
     ):
         """
         Compute torque command to reach given target position using a PD
         controller.
 
         Args:
-            desired_position (array-like, shape=(n,)):  Desired joint positions.
-            current_position (array-like, shape=(n,)):  Current joint positions.
-            current_velocity (array-like, shape=(n,)):  Current joint velocities.
+            observation (dict):  Observation dict containing robot joint position
+            tip_positions (array-like, shape=(3, 3)):  Desired tip positions for trifinger robot
+            joint_positions (array_like, shape=(9,)):  Desired joint positions
             kp (array-like, shape=(n,)): P-gains, one for each joint.
             kd (array-like, shape=(n,)): D-gains, one for each joint.
 
@@ -134,9 +135,15 @@ class PDControlPolicy:
             List of torques to be sent to the joints of the finger in order to
             reach the specified joint_positions.
         """
+        if tip_positions is not None:
+            joint_positions = self.ik_move(observation, tip_positions)
+        else:
+            assert (
+                joint_positions is not None
+            ), "position_pd_control() takes either tip position or joint position"
         current_position = observation["robot_observation"]["position"]
         current_velocity = observation["robot_observation"]["velocity"]
-        position_error = desired_position - current_position
+        position_error = joint_positions - current_position
         if kp is None:
             kp = self.position_gains
         if kd is None:
@@ -154,6 +161,7 @@ class PDControlPolicy:
         return joint_torques
 
     def position_control(self, observation, grasp_points):
+        """Computes joint torques using tip link jacobian to achieve desired tip position"""
         applied_torque = np.zeros(9, dtype="float32")
         tip_velocities = self.compute_tip_velocity(observation).reshape((3, 3))
         tip_positions = np.asarray(
@@ -225,7 +233,7 @@ class PDControlPolicy:
         else:
             self.previous_global_forces = global_forces
 
-        return self.compute_fingertip_forces(-global_forces)
+        return self.fingertip_force_controller(-global_forces)
 
     def pi_controller(self, des_wrench, step=0):
         if step == 0:
@@ -253,17 +261,16 @@ class PDControlPolicy:
         self,
         observation,
         ft_goal,
-        interp_n,
         tol=0.006,
         max_steps=500,
     ):
         current_position = observation["robot_observation"]["position"]
         # current_ft_pos = self.kinematics.forward_kinematics(current_position)
-        assert self.action_space.contains("position")
         # TODO: tol currently hardcoded to 0.001, make it smaller and a variable
-        q = self.kinematics.inverse_kinematics(
+        q, err = self.kinematics.inverse_kinematics(
             ft_goal, current_position, tolerance=tol, max_iterations=max_steps
         )
+        # print(err)
         return q
 
     def control(self, mode, observation):
@@ -274,21 +281,22 @@ class PDControlPolicy:
         # safe grasp point moves slightly off of contact surface
         grasp_points, grasp_normals = self.grasp_points, self.grasp_normals
         safe_pos = grasp_points - grasp_normals * 0.1
-
+        safe_pos[:, 2] = 0.05
         if mode == "off":
-            pass
+            return self.position_pd_control(
+                observation, desired_position=self.joint_positions
+            )
         if mode == "safe":
-            return self.tip_position_control(observation, safe_pos)
+            return self.position_pd_control(observation, safe_pos)
         if mode == "pos":
-            return self.tip_position_control(observation, grasp_points)
+            return self.position_control(observation, grasp_points)
         if mode == "vel":
             # move radially in along xy plane
             return self.vel_control_force_limit(
                 observation, grasp_points, grasp_normals
             )
         if mode == "ik":
-            desired_position = self.ik_move(observation, grasp_points)
-            return self.compute_pd_control_torques(observation, desired_position)
+            return self.position_pd_control(observation, grasp_points)
         if mode == "up":
             # TODO: Add nerf
             # if self.use_grad_est:
@@ -302,13 +310,13 @@ class PDControlPolicy:
 
     def gravity_comp(self, observation):
         q_current = observation["robot_observation"]["position"]
-        # dq0 = observation["robot_observation"]["velocity"]
-        # g = np.asarray(
-        #     p.calculateInverseDynamics(
-        #         1, list(q_current), list(dq0), [0.0 for _ in range(9)]
-        #     )
-        # )
-        # return g
+        dq0 = observation["robot_observation"]["velocity"]
+        g = np.asarray(
+            p.calculateInverseDynamics(
+                1, list(q_current), list(dq0), [0.0 for _ in range(9)]
+            )
+        )
+        return g
         g_torques = np.zeros(9)
         for finger_id in range(3):
             _, g = self.kinematics.compute_lambda_and_g_matrix(
@@ -316,21 +324,6 @@ class PDControlPolicy:
             )
             g_torques += g
         return g_torques
-
-    @staticmethod
-    def set_mode(t):
-        if t < 0:  # make 500 to test gravity comp
-            # fingers need to compensate for gravity and hold tip positions:
-            mode = "off"  # Box needs this to get ot graps position
-        elif t < 1000:
-            mode = "safe"
-        elif t < 1500:
-            mode = "pos"
-        elif t < 2000:
-            mode = "pos"
-        else:
-            mode = "up"
-        return mode
 
     def predict(self, observation, t):
         if t == 0:
@@ -347,7 +340,7 @@ class PDControlPolicy:
         if mode != "off":
             # get joint torques for finger 0 to move its tip to the goal position
             self.joint_torques = self.control(mode, observation)
-            # self.joint_torques += self.gravity_comp(observation)
+            self.joint_torques += self.gravity_comp(observation)
             self.joint_torques = self.clip_to_space(self.joint_torques)
         else:
             self.joint_torques = self.gravity_comp(observation)
@@ -377,3 +370,20 @@ class PDControlPolicy:
                 for x in self._prev_obs
             ]
         )
+
+    @staticmethod
+    def set_mode(t):
+        if t < 1000:  # make 500 to test gravity comp
+            # fingers need to compensate for gravity and hold tip positions:
+            mode = "off"  # Box needs this to get ot graps position
+        elif t < 1500:
+            mode = "safe"
+        elif t < 2000:
+            mode = "ik"
+        elif t < 2500:
+            mode = "ik"
+        else:
+            mode = "up"
+            assert False, "END OF EPISODE"
+
+        return mode
