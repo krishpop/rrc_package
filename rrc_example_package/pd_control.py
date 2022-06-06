@@ -55,11 +55,13 @@ class PDControlPolicy:
         self.dt = 0.001
         self._tip_jacobians = []
         self._prev_obs = collections.deque([], 5)
+        self.grasp_points = self.grasp_normals = None
+        self.last_mode = ""
 
     def clip_to_space(self, action):
         return np.clip(action, self.action_space.low, self.action_space.high)
 
-    def compute_grasp_points_normals(self, observation, overwrite_z=True):
+    def sample_grasp(self, observation, overwrite_z=True):
         curr_pose = {
             "position": np.mean(self.prev_obj_position, axis=0),
             "orientation": Rotation.from_euler(
@@ -270,18 +272,25 @@ class PDControlPolicy:
         q, err = self.kinematics.inverse_kinematics(
             ft_goal, current_position, tolerance=tol, max_iterations=max_steps
         )
-        # print(err)
+        # print("IK Error:", err)
         return q
 
     def control(self, mode, observation):
         if mode != "up":
-            self.grasp_points, self.grasp_normals = self.compute_grasp_points_normals(
-                observation
-            )
+            if self.grasp_points is None:
+                self.grasp_points, self.grasp_normals = self.sample_grasp(observation)
         # safe grasp point moves slightly off of contact surface
         grasp_points, grasp_normals = self.grasp_points, self.grasp_normals
         safe_pos = grasp_points - grasp_normals * 0.1
         safe_pos[:, 2] = 0.05
+        if self.last_mode != mode:
+            tip_positions = self.kinematics.forward_kinematics(
+                observation["robot_observation"]["position"]
+            )
+            print("safe pos:", safe_pos)
+            print("tip_positions:", tip_positions)
+
+        self.last_mode = mode
         if mode == "off":
             return self.position_pd_control(
                 observation, desired_position=self.joint_positions
@@ -340,16 +349,11 @@ class PDControlPolicy:
         if mode != "off":
             # get joint torques for finger 0 to move its tip to the goal position
             self.joint_torques = self.control(mode, observation)
-            self.joint_torques += self.gravity_comp(observation)
-            self.joint_torques = self.clip_to_space(self.joint_torques)
-        else:
-            tip_position = self.kinematics.forward_kinematics(
-                observation["robot_observation"]["position"]
-            )
-            tip_position[:, 2] = 0.07
-            self.joint_torques = self.position_pd_control(observation, tip_position)
             # self.joint_torques += self.gravity_comp(observation)
+        else:
+            self.joint_torques = self.gravity_comp(observation)
 
+        self.joint_torques = self.clip_to_space(self.joint_torques)
         # make sure to return a copy, not a reference to self.joint_positions
         self._tip_jacobians = []
         return np.array(self.joint_torques)
@@ -378,15 +382,12 @@ class PDControlPolicy:
 
     @staticmethod
     def set_mode(t):
-        return "off"
-        if t < 1000:  # make 500 to test gravity comp
+        if t < 0:
             # fingers need to compensate for gravity and hold tip positions:
             mode = "off"  # Box needs this to get ot graps position
         elif t < 1500:
             mode = "safe"
-        elif t < 2000:
-            mode = "ik"
-        elif t < 2500:
+        elif t < 1000:
             mode = "ik"
         else:
             mode = "up"

@@ -260,7 +260,7 @@ def closest_face_centers(obj_pose):
                 face = OBJ_FACES_INFO[ground_face]["adjacent_faces"][2]  # 3
             else:
                 face = OBJ_FACES_INFO[ground_face]["adjacent_faces"][3]  # 5
-        # print("first choice face: {}".format(face))
+        print("first choice face: {}".format(face))
 
         # Handle faces that may already be assigned
         if face not in free_faces:
@@ -275,7 +275,7 @@ def closest_face_centers(obj_pose):
                     face = OBJ_FACES_INFO[ground_face]["adjacent_faces"][2]  # 3
                 else:
                     face = OBJ_FACES_INFO[ground_face]["adjacent_faces"][3]  # 5
-            # print("second choice face: {}".format(face))
+            print("second choice face: {}".format(face))
 
         # If backup face isn't free, assign random face from free_faces
         if face not in free_faces:
@@ -288,7 +288,7 @@ def closest_face_centers(obj_pose):
         xy_distances[curr_finger_id, :] = -np.inf
         # Remove face from free_faces
         free_faces.remove(face)
-    # print(assigned_faces)
+    print(assigned_faces)
     # Set contact point params
     cp_params = []
     for i in range(3):
@@ -297,8 +297,8 @@ def closest_face_centers(obj_pose):
         # print(i)
         # print(param)
         cp_params.append(param)
-    # print("assigning cp params for lifting")
-    # print(cp_params)
+    print("assigning cp params for lifting")
+    print(cp_params)
     return get_cp_pos_wf_from_cp_params(
         cp_params, obj_pose["position"], obj_pose["orientation"]
     )
