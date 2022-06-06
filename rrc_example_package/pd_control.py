@@ -310,13 +310,13 @@ class PDControlPolicy:
 
     def gravity_comp(self, observation):
         q_current = observation["robot_observation"]["position"]
-        dq0 = observation["robot_observation"]["velocity"]
-        g = np.asarray(
-            p.calculateInverseDynamics(
-                1, list(q_current), list(dq0), [0.0 for _ in range(9)]
-            )
-        )
-        return g
+        # dq0 = observation["robot_observation"]["velocity"]
+        # g = np.asarray(
+        #     p.calculateInverseDynamics(
+        #         1, list(q_current), list(dq0), [0.0 for _ in range(9)]
+        #     )
+        # )
+        # return g
         g_torques = np.zeros(9)
         for finger_id in range(3):
             _, g = self.kinematics.compute_lambda_and_g_matrix(

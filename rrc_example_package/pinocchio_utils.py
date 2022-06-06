@@ -104,6 +104,19 @@ class Kinematics:
         )
         return Ji
 
+    def compute_gravity_comp_one_finger(self, finger_id, q, Jvi, grav=-9.81):
+        links = ["lower", "middle", "upper"]
+        finger_links = [f"finger_{link}_link_{finger_id*120}" for link in links]
+        g = 0
+        for j, finger_link in enumerate(finger_links):
+            fid = self.finger_link_ids[finger_link] - 2
+            Jj = self.compute_jacobian(fid, q)
+            Jjv = Jj[:3, :]
+            # want to resist grav_force so acceleration at tip is 0
+            grav_force = np.array([0, 0, grav * self.ms[j]])
+            g -= Jjv.T @ grav_force
+        return g
+
     def compute_lambda_and_g_matrix(self, finger_id, q, Jvi, grav=-9.81):
         Ai = np.zeros((9, 9))
         g = np.zeros(9)
