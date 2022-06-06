@@ -373,6 +373,7 @@ class PDControlPolicy:
 
     @staticmethod
     def set_mode(t):
+        return "off"
         if t < 1000:  # make 500 to test gravity comp
             # fingers need to compensate for gravity and hold tip positions:
             mode = "off"  # Box needs this to get ot graps position
