@@ -343,7 +343,12 @@ class PDControlPolicy:
             self.joint_torques += self.gravity_comp(observation)
             self.joint_torques = self.clip_to_space(self.joint_torques)
         else:
-            self.joint_torques = self.gravity_comp(observation)
+            tip_position = self.kinematics.forward_kinematics(
+                observation["robot_observation"]["position"]
+            )
+            tip_position[:, 2] = 0.07
+            self.joint_torques = self.position_pd_control(observation, tip_position)
+            self.joint_torques += self.gravity_comp(observation)
 
         # make sure to return a copy, not a reference to self.joint_positions
         self._tip_jacobians = []
