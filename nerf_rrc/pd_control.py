@@ -18,13 +18,14 @@ except ImportError:
 from scipy.spatial.transform import Rotation
 
 from nerf_rrc import pinocchio_utils, utils
+from nerf_rrc.control import pos_control
 from nerf_rrc.quaternions import Quaternion
 
 
 class PDControlPolicy:
     """PD control policy which just points at the goal positions with one finger."""
 
-    position_gains = np.array([10.0, 10.0, 6.0] * 3)
+    position_gains = np.array([5.0, 5.0, 3.0] * 3)
     velocity_gains = np.array([0.5, 1.0, 0.5] * 3)
 
     def __init__(self, action_space, trajectory):
@@ -60,6 +61,7 @@ class PDControlPolicy:
         self._prev_obs = collections.deque([], 5)
         self.grasp_points = self.grasp_normals = None
         self.last_mode = ""
+        self.pd_control_params = pos_control.load_config()
 
     def clip_to_space(self, action):
         return np.clip(action, self.action_space.low, self.action_space.high)
@@ -83,7 +85,7 @@ class PDControlPolicy:
     def compute_tip_jacobians(self, q0):
         jacobians = []
         for fid in self.kinematics.tip_link_ids:
-            Ji = self.kinematics.compute_jacobian(fid, q0)
+            Ji = self.kinematics.compute_local_jacobian(fid, q0)
             jacobians.append(Ji)
         return jacobians
 
@@ -314,6 +316,18 @@ class PDControlPolicy:
                 observation, desired_position=self.joint_positions
             )
         if mode == "safe":
+            q, dq = (
+                observation["robot_observation"]["position"],
+                observation["robot_observation"]["velocity"],
+            )
+            return pos_control.get_joint_torques(
+                safe_pos.flatten(),
+                self.kinematics.robot_model,
+                self.kinematics.data,
+                q,
+                dq,
+                self.pd_control_params,
+            )
             return self.position_pd_control(observation, safe_pos)
         if mode == "pos":
             return self.position_control(observation, grasp_points)

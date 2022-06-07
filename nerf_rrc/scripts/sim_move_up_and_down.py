@@ -37,3 +37,7 @@ def main():
 
         camera_observation = robot.get_camera_observation(t)
         print("Object position:", camera_observation.object_pose.position)
+
+
+if __name__ == "__main__":
+    main()

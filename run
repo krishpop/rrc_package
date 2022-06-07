@@ -5,7 +5,7 @@
 
 # Examples for Stage 1
 # ros2 run nerf_rrc real_move_up_and_down "$@"
-ros2 run nerf_rrc real_trajectory_example_with_gym "$@"
+ros2 run nerf_rrc real_up_and_down_tip_control "$@"
 
 # Example for Stage 2
 # ros2 run nerf_rrc dice_example_with_gym "$@"

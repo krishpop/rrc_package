@@ -85,7 +85,7 @@ class Kinematics:
             for link_id in self.tip_link_ids
         ]
 
-    def compute_jacobian(self, frame_id: int, q0: np.ndarray) -> np.ndarray:
+    def compute_local_jacobian(self, frame_id: int, q0: np.ndarray) -> np.ndarray:
         pinocchio.computeJointJacobians(
             self.robot_model,
             self.data,
@@ -110,7 +110,7 @@ class Kinematics:
         g = 0
         for j, finger_link in enumerate(finger_links):
             fid = self.finger_link_ids[finger_link] - 2
-            Jj = self.compute_jacobian(fid, q)
+            Jj = self.compute_local_jacobian(fid, q)
             Jjv = Jj[:3, :]
             # want to resist grav_force so acceleration at tip is 0
             grav_force = np.array([0, 0, grav * self.ms[j]])
@@ -125,7 +125,7 @@ class Kinematics:
         finger_links = [f"finger_{link}_link_{finger_id * 120}" for link in links]
         for j, finger_link in enumerate(finger_links):
             fid = self.finger_link_ids[finger_link] - 2
-            Jj = self.compute_jacobian(fid, q)
+            Jj = self.compute_local_jacobian(fid, q)
             Jjv = Jj[:3, :]
             Jjw = Jj[3:, :]
             g -= self.ms[j] * Jjv.T @ grav  # * 0.33
@@ -142,7 +142,7 @@ class Kinematics:
     ) -> typing.Tuple[np.ndarray, np.ndarray]:
         """Compute one IK iteration for a single finger."""
         dt = 1.0e-1
-        Ji = self.compute_jacobian(frame_id, q0)[:3, :]
+        Ji = self.compute_local_jacobian(frame_id, q0)[:3, :]
         xcurrent = self.data.oMf[frame_id].translation
         try:
             Jinv = np.linalg.inv(Ji)
