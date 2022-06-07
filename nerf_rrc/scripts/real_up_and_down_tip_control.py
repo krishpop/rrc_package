@@ -25,9 +25,11 @@ def main():
         cube_trajectory_env.ActionType.TORQUE,
         step_size=1,
     )
-    control_params = pos_control.load_config()
+    control_params = pos_control.PosControlConfig(
+        Kp=20.0, Kd=[0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5], damping=1e-12
+    )
 
-    policy = PDControlPolicy(env.action_space, goal)
+    policy = PDControlPolicy(env.action_space, goal, control_params)
     kin = policy.kin
 
     observation = env.reset()

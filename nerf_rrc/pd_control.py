@@ -25,10 +25,7 @@ from nerf_rrc.quaternions import Quaternion
 class PDControlPolicy:
     """PD control policy which just points at the goal positions with one finger."""
 
-    position_gains = np.array([5.0, 5.0, 3.0] * 3)
-    velocity_gains = np.array([0.5, 1.0, 0.5] * 3)
-
-    def __init__(self, action_space, trajectory):
+    def __init__(self, action_space, trajectory, control_params=None):
         self.action_space = action_space
         self.trajectory = trajectory
         if get_package_share_directory is not None:
@@ -61,7 +58,10 @@ class PDControlPolicy:
         self._prev_obs = collections.deque([], 5)
         self.grasp_points = self.grasp_normals = None
         self.last_mode = ""
-        self.pd_control_params = pos_control.load_config()
+        if control_params is None:
+            self.position_control_params = pos_control.load_config()
+        else:
+            self.position_control_params = control_params
 
     def clip_to_space(self, action):
         return np.clip(action, self.action_space.low, self.action_space.high)
@@ -160,9 +160,9 @@ class PDControlPolicy:
         current_velocity = observation["robot_observation"]["velocity"]
         position_error = joint_positions - current_position
         if kp is None:
-            kp = self.position_gains
+            kp = self.position_control_params.Kp
         if kd is None:
-            kd = self.velocity_gains
+            kd = self.position_control_params.Kd
 
         position_feedback = np.asarray(kp) * position_error
         velocity_feedback = np.asarray(kd) * current_velocity
@@ -326,7 +326,7 @@ class PDControlPolicy:
                 self.kinematics.data,
                 q,
                 dq,
-                self.pd_control_params,
+                self.position_control_params,
             )
             return self.position_pd_control(observation, safe_pos)
         if mode == "pos":
