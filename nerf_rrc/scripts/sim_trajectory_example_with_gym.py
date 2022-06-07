@@ -7,8 +7,8 @@ a dummy policy.
 import json
 import sys
 
-from rrc_example_package import cube_trajectory_env
-from rrc_example_package.pd_control import PDControlPolicy
+from nerf_rrc import cube_trajectory_env
+from nerf_rrc.pd_control import PDControlPolicy
 
 
 def main():

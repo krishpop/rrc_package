@@ -9,13 +9,16 @@ import trifinger_simulation.finger_types_data
 
 try:
     from ament_index_python.packages import get_package_share_directory
+
+    real_robot = True
 except ImportError:
     get_package_share_directory = None
+    real_robot = False
     print("ROS not imported, testing mode")
 from scipy.spatial.transform import Rotation
 
-from rrc_example_package import pinocchio_utils, utils
-from rrc_example_package.quaternions import Quaternion
+from nerf_rrc import pinocchio_utils, utils
+from nerf_rrc.quaternions import Quaternion
 
 
 class PDControlPolicy:
@@ -334,19 +337,21 @@ class PDControlPolicy:
 
     def gravity_comp(self, observation):
         q_current = observation["robot_observation"]["position"]
-        # dq0 = observation["robot_observation"]["velocity"]
-        # g = np.asarray(
-        #     p.calculateInverseDynamics(
-        #         1, list(q_current), list(dq0), [0.0 for _ in range(9)]
-        #     )
-        # )
-        # return g
-        g_torques = np.zeros(9)
-        for finger_id in range(3):
-            _, g = self.kinematics.compute_lambda_and_g_matrix(
-                finger_id, q_current, self.tip_jacobians[finger_id][:3, :]
+        if not real_robot:
+            dq0 = observation["robot_observation"]["velocity"]
+            g = np.asarray(
+                p.calculateInverseDynamics(
+                    1, list(q_current), list(dq0), [0.0 for _ in range(9)]
+                )
             )
-            g_torques += g
+            return g
+        else:
+            g_torques = np.zeros(9)
+            for finger_id in range(3):
+                _, g = self.kinematics.compute_lambda_and_g_matrix(
+                    finger_id, q_current, self.tip_jacobians[finger_id][:3, :]
+                )
+                g_torques += g
         return g_torques
 
     def predict(self, observation, t):

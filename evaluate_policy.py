@@ -23,8 +23,8 @@ evaluate the actual performance of the policy.
 import argparse
 import json
 
-from rrc_example_package import cube_trajectory_env
-from rrc_example_package.example import PointAtTrajectoryPolicy
+from nerf_rrc import cube_trajectory_env
+from nerf_rrc.example import PointAtTrajectoryPolicy
 
 
 class RandomPolicy:

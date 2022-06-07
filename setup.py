@@ -1,7 +1,7 @@
 import os
 import setuptools
 
-PACKAGE_NAME = "rrc_example_package"
+PACKAGE_NAME = "nerf_rrc"
 
 setuptools.setup(
     name=PACKAGE_NAME,
@@ -30,11 +30,11 @@ setuptools.setup(
     # scripts here.
     entry_points={
         "console_scripts": [
-            "real_move_up_and_down = rrc_example_package.scripts.real_move_up_and_down:main",
-            "sim_move_up_and_down = rrc_example_package.scripts.sim_move_up_and_down:main",
-            "real_trajectory_example_with_gym = rrc_example_package.scripts.real_trajectory_example_with_gym:main",
-            "sim_trajectory_example_with_gym = rrc_example_package.scripts.sim_trajectory_example_with_gym:main",
-            "dice_example_with_gym = rrc_example_package.scripts.dice_example_with_gym:main",
+            "real_move_up_and_down = nerf_rrc.scripts.real_move_up_and_down:main",
+            "sim_move_up_and_down = nerf_rrc.scripts.sim_move_up_and_down:main",
+            "real_trajectory_example_with_gym = nerf_rrc.scripts.real_trajectory_example_with_gym:main",
+            "sim_trajectory_example_with_gym = nerf_rrc.scripts.sim_trajectory_example_with_gym:main",
+            "dice_example_with_gym = nerf_rrc.scripts.dice_example_with_gym:main",
         ],
     },
 )

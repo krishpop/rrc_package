@@ -7,8 +7,8 @@ using a dummy policy.
 import json
 import sys
 
-from rrc_example_package import rearrange_dice_env
-from rrc_example_package.example import PointAtDieGoalPositionsPolicy
+from nerf_rrc import rearrange_dice_env
+from nerf_rrc.example import PointAtDieGoalPositionsPolicy
 
 
 def main():

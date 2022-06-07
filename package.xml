@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>rrc_example_package</name>
-  <version>2.0.0</version>
+  <name>nerf_rrc</name>
+  <version>1.0.0</version>
   <description>
-      Example package for the Real Robot Challenge Submission System.
+      Package for running nerf_grasping on the Real Robot Challenge Submission System.
   </description>
 
-  <maintainer email="felix.widmaier@tue.mpg.de">Felix Widmaier</maintainer>
+  <maintainer email="krshna@stanford.edu">Krishnan Srinivasan</maintainer>
 
   <license>BSD 3-clause</license>
 
