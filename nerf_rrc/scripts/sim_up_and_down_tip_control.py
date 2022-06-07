@@ -20,7 +20,7 @@ def main():
     goal_json = sys.argv[1]
     goal = json.loads(goal_json)
 
-    env = cube_trajectory_env.RealRobotCubeTrajectoryEnv(
+    env = cube_trajectory_env.SimCubeTrajectoryEnv(
         goal,
         cube_trajectory_env.ActionType.TORQUE,
         step_size=1,

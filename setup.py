@@ -32,6 +32,7 @@ setuptools.setup(
         "console_scripts": [
             "real_move_up_and_down = nerf_rrc.scripts.real_move_up_and_down:main",
             "real_up_and_down_tip_control = nerf_rrc.scripts.real_up_and_down_tip_control:main",
+            "sim_up_and_down_tip_control = nerf_rrc.scripts.sim_up_and_down_tip_control:main",
             "sim_move_up_and_down = nerf_rrc.scripts.sim_move_up_and_down:main",
             "real_trajectory_example_with_gym = nerf_rrc.scripts.real_trajectory_example_with_gym:main",
             "sim_trajectory_example_with_gym = nerf_rrc.scripts.sim_trajectory_example_with_gym:main",
