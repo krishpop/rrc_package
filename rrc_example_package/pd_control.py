@@ -21,7 +21,7 @@ from rrc_example_package.quaternions import Quaternion
 class PDControlPolicy:
     """PD control policy which just points at the goal positions with one finger."""
 
-    position_gains = np.array([15.0, 15.0, 9.0] * 3)
+    position_gains = np.array([10.0, 10.0, 6.0] * 3)
     velocity_gains = np.array([0.5, 1.0, 0.5] * 3)
 
     def __init__(self, action_space, trajectory):
@@ -71,6 +71,7 @@ class PDControlPolicy:
         grasp_points = np.asarray(utils.closest_face_centers(curr_pose)).reshape(3, 3)
         if overwrite_z:
             grasp_points[:, 2] = utils.CUBE_HALF_SIZE
+        # Grasp normals are the contact pt in world frame - CoM of object
         grasp_normals = grasp_points - observation["object_observation"]["position"]
         grasp_normals[:, 2] *= 0.0
         grasp_normals = grasp_normals / np.linalg.norm(grasp_normals, axis=1)
@@ -111,6 +112,14 @@ class PDControlPolicy:
         angular_vel = dtheta / self.dt
         return vel, angular_vel
 
+    def compute_finger_assignment(self, tip_positions, grasp_points):
+        pdist = np.linalg.norm(
+            tip_positions[:, None, :] - grasp_points[None, :, :], axis=-1
+        )
+        perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]]
+        net_dists = [sum([pdist[i][j] for i, j in enumerate(p)]) for p in perms]
+        return perms[np.argmin(net_dists)]
+
     def fingertip_force_controller(self, tip_forces_wf):
         """Controller returns joint torques to achieve desired fingertip forces"""
         tip_forces_wf = tip_forces_wf.reshape(3, 3)
@@ -139,10 +148,9 @@ class PDControlPolicy:
         """
         if tip_positions is not None:
             joint_positions = self.ik_move(observation, tip_positions)
-        else:
-            assert (
-                joint_positions is not None
-            ), "position_pd_control() takes either tip position or joint position"
+        assert (
+            joint_positions is not None
+        ), "position_pd_control(): joint_positions undefined"
         current_position = observation["robot_observation"]["position"]
         current_velocity = observation["robot_observation"]["velocity"]
         position_error = joint_positions - current_position
@@ -284,11 +292,18 @@ class PDControlPolicy:
         safe_pos = grasp_points - grasp_normals * 0.1
         safe_pos[:, 2] = 0.05
         if self.last_mode != mode:
-            tip_positions = self.kinematics.forward_kinematics(
-                observation["robot_observation"]["position"]
+            tip_positions = np.asarray(
+                self.kinematics.forward_kinematics(
+                    observation["robot_observation"]["position"]
+                )
+            ).reshape(3, 3)
+            finger_assignment = self.compute_finger_assignment(
+                tip_positions, grasp_points
             )
             print("safe pos:", safe_pos)
             print("tip_positions:", tip_positions)
+            print("finger assignment:", [0, 1, 2])
+            print("finger assignment by distance:", finger_assignment)
 
         self.last_mode = mode
         if mode == "off":

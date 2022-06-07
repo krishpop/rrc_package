@@ -8,7 +8,7 @@ import numpy as np
 try:
     import robot_fingers
 except ImportError:
-    robot_fingers = None 
+    robot_fingers = None
     print("ROS not imported, testing mode")
 import trifinger_simulation
 import trifinger_simulation.visual_objects
@@ -169,9 +169,7 @@ class BaseCubeTrajectoryEnv(gym.GoalEnv):
         # This is just some sanity check to verify that the given desired_goal
         # actually matches with the active goal in the trajectory.
         active_goal = np.asarray(
-            task.get_active_goal(
-                self.info["trajectory"], self.info["time_index"]
-            )
+            task.get_active_goal(self.info["trajectory"], self.info["time_index"])
         )
         assert np.all(active_goal == desired_goal), "{}: {} != {}".format(
             info["time_index"], active_goal, desired_goal
@@ -229,9 +227,7 @@ class BaseCubeTrajectoryEnv(gym.GoalEnv):
         camera_observation = self.platform.get_camera_observation(t)
         object_observation = camera_observation.filtered_object_pose
 
-        active_goal = np.asarray(
-            task.get_active_goal(self.info["trajectory"], t)
-        )
+        active_goal = np.asarray(task.get_active_goal(self.info["trajectory"], t))
 
         observation = {
             "robot_observation": {
@@ -318,9 +314,7 @@ class SimCubeTrajectoryEnv(BaseCubeTrajectoryEnv):
             raise RuntimeError("Call `reset()` before starting to step.")
 
         if not self.action_space.contains(action):
-            raise ValueError(
-                "Given action is not contained in the action space."
-            )
+            raise ValueError("Given action is not contained in the action space.")
 
         num_steps = self.step_size
 
@@ -342,9 +336,7 @@ class SimCubeTrajectoryEnv(BaseCubeTrajectoryEnv):
 
             # update goal visualization
             if self.visualization:
-                goal_position = task.get_active_goal(
-                    self.info["trajectory"], t
-                )
+                goal_position = task.get_active_goal(self.info["trajectory"], t)
                 self.goal_marker.set_state(goal_position, (0, 0, 0, 1))
 
             # Use observations of step t + 1 to follow what would be expected
@@ -362,9 +354,7 @@ class SimCubeTrajectoryEnv(BaseCubeTrajectoryEnv):
             #
             # self.info["time_index"] = t
 
-            observation = self._create_observation(
-                self.info["time_index"], action
-            )
+            observation = self._create_observation(self.info["time_index"], action)
 
             reward += self.compute_reward(
                 observation["achieved_goal"],
@@ -376,7 +366,7 @@ class SimCubeTrajectoryEnv(BaseCubeTrajectoryEnv):
 
         return observation, reward, is_done, self.info
 
-    def reset(self):
+    def reset(self, initial_pose=None):
         """Reset the environment."""
         # hard-reset simulation
         del self.platform
@@ -384,9 +374,9 @@ class SimCubeTrajectoryEnv(BaseCubeTrajectoryEnv):
         # initialize simulation
         initial_robot_position = trifingerpro_limits.robot_position.default
         # initialize cube at the centre
-        initial_object_pose = task.move_cube.Pose(
-            position=task.INITIAL_CUBE_POSITION
-        )
+        if initial_pose is None:
+            initial_pose = task.INITIAL_CUBE_POSITION
+        initial_object_pose = task.move_cube.Pose(position=initial_pose)
 
         self.platform = trifinger_simulation.TriFingerPlatform(
             visualization=self.visualization,
@@ -442,9 +432,7 @@ class RealRobotCubeTrajectoryEnv(BaseCubeTrajectoryEnv):
             raise RuntimeError("Call `reset()` before starting to step.")
 
         if not self.action_space.contains(action):
-            raise ValueError(
-                "Given action is not contained in the action space."
-            )
+            raise ValueError("Given action is not contained in the action space.")
 
         num_steps = self.step_size
 
@@ -481,9 +469,7 @@ class RealRobotCubeTrajectoryEnv(BaseCubeTrajectoryEnv):
     def reset(self):
         # cannot reset multiple times
         if self.platform is not None:
-            raise RuntimeError(
-                "Once started, this environment cannot be reset."
-            )
+            raise RuntimeError("Once started, this environment cannot be reset.")
 
         self.platform = robot_fingers.TriFingerPlatformWithObjectFrontend()
 
