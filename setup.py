@@ -17,6 +17,7 @@ setuptools.setup(
         # Include our package.xml file
         (os.path.join("share", PACKAGE_NAME), ["package.xml"]),
     ],
+    include_package_data=True,
     # This is important as well
     install_requires=["setuptools"],
     zip_safe=True,

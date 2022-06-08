@@ -19,14 +19,18 @@ def main():
     # the goal is passed as JSON string
     goal_json = sys.argv[1]
     goal = json.loads(goal_json)
-
+    if len(sys.argv) > 2:
+        control_params = pos_control.load_config(
+            pos_control.BASEDIR + "/pos_control_real.yaml"
+        )
+    else:
+        control_params = pos_control.PosControlConfig(
+            Kp=20.0, Kd=[0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5], damping=1e-12
+        )
     env = cube_trajectory_env.RealRobotCubeTrajectoryEnv(
         goal,
         cube_trajectory_env.ActionType.TORQUE,
         step_size=1,
-    )
-    control_params = pos_control.PosControlConfig(
-        Kp=20.0, Kd=[0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5], damping=1e-12
     )
 
     policy = PDControlPolicy(env.action_space, goal, control_params)
@@ -39,6 +43,7 @@ def main():
         kin.forward_kinematics(observation["robot_observation"]["position"])
     ).flatten()
     min_height, max_height = 0.05, 0.1
+    tip_dists = []
     while t < 4000:
         h = (
             0.5 * (1 + np.sin(np.pi / 1000 * t)) * (max_height - min_height)
@@ -57,9 +62,11 @@ def main():
         obs = observation["robot_observation"]
         tip_pos = np.asarray(kin.forward_kinematics(obs["position"])).flatten()
         tip_dist = np.linalg.norm(des_tip_pos - tip_pos)
+        tip_dists.append(tip_dist)
         if t % 100 == 0:
             print(f"iteration {t}")
             print("reward:", reward)
             print("tip dist:", tip_dist)
         t = info["time_index"]
+    print("Mean tip dist:", np.mean(tip_dists))
     assert False, f"End of Episode, iteration {t}"
