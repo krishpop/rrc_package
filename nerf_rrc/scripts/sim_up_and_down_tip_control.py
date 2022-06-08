@@ -29,13 +29,14 @@ def main():
     elif len(sys.argv) == 3:
         control_params = pos_control.load_config(sys.argv[2])
     else:
-        assert False, "len of sys.argv was: {}".format(len(sys.argv))
+        control_params = None
     goal = json.loads(open(goal_json, "r").read())["_goal"]
 
     env = cube_trajectory_env.SimCubeTrajectoryEnv(
         goal,
         cube_trajectory_env.ActionType.POSITION,
         step_size=1,
+        visualization=True,
     )
 
     policy = PDControlPolicy(env.action_space, goal, control_params)
@@ -53,7 +54,9 @@ def main():
         h = 0.5 * (1 + np.sin(np.pi / 500 * t)) * (max_height - min_height) + min_height
         des_tip_pos = orig_tp.copy()
         des_tip_pos[2::3] = h
-        action = policy.predict(observation, t)
+        policy.position_pd_control(observation, des_tip_pos.reshape(3, 3))
+        action = policy.joint_positions.copy()
+        action = clip_to_space(env.action_space, action)
         # obs = observation["robot_observation"]
         # q, dq = obs["position"], obs["velocity"]
         # action = pos_control.get_joint_torques(

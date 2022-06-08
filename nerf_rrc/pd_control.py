@@ -28,7 +28,7 @@ class PDControlPolicy:
 
     def __init__(self, action_space, trajectory, control_params=None):
         self.action_space = action_space
-        if np.isclose(action_space.low == trifingerpro_limits.robot_position.low):
+        if np.isclose(action_space.low, trifingerpro_limits.robot_position.low).all():
             self.action_type = "position"
         else:
             self.action_type = "torque"
