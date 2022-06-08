@@ -34,7 +34,7 @@ def main():
 
     env = cube_trajectory_env.SimCubeTrajectoryEnv(
         goal,
-        cube_trajectory_env.ActionType.TORQUE,
+        cube_trajectory_env.ActionType.POSITION,
         step_size=1,
     )
 
@@ -53,12 +53,13 @@ def main():
         h = 0.5 * (1 + np.sin(np.pi / 500 * t)) * (max_height - min_height) + min_height
         des_tip_pos = orig_tp.copy()
         des_tip_pos[2::3] = h
-        obs = observation["robot_observation"]
-        q, dq = obs["position"], obs["velocity"]
-        action = pos_control.get_joint_torques(
-            des_tip_pos, kin.robot_model, kin.data, q, dq, control_params
-        )
-        action = clip_to_space(env.action_space, action)
+        action = policy.predict(observation, t)
+        # obs = observation["robot_observation"]
+        # q, dq = obs["position"], obs["velocity"]
+        # action = pos_control.get_joint_torques(
+        #     des_tip_pos, kin.robot_model, kin.data, q, dq, control_params
+        # )
+        # action = clip_to_space(env.action_space, action)
 
         observation, reward, is_done, info = env.step(action)
         obs = observation["robot_observation"]

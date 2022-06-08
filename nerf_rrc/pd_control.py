@@ -6,6 +6,7 @@ import os.path as osp
 import numpy as np
 import pybullet as p
 import trifinger_simulation.finger_types_data
+from trifinger_simulation import trifingerpro_limits
 
 try:
     from ament_index_python.packages import get_package_share_directory
@@ -27,6 +28,11 @@ class PDControlPolicy:
 
     def __init__(self, action_space, trajectory, control_params=None):
         self.action_space = action_space
+        if np.isclose(action_space.low == trifingerpro_limits.robot_position.low):
+            self.action_type = "position"
+        else:
+            self.action_type = "torque"
+        print("setting action type:", self.action_type)
         self.trajectory = trajectory
         if get_package_share_directory is not None:
             robot_properties_path = get_package_share_directory(
@@ -63,8 +69,19 @@ class PDControlPolicy:
         else:
             self.position_control_params = control_params
 
-    def clip_to_space(self, action):
-        return np.clip(action, self.action_space.low, self.action_space.high)
+    def clip_to_torque_space(self, action):
+        return np.clip(
+            action,
+            trifingerpro_limits.robot_torque.low,
+            trifingerpro_limits.robot_torque.high,
+        )
+
+    def clip_to_joint_space(self, action):
+        return np.clip(
+            action,
+            trifingerpro_limits.robot_position.low,
+            trifingerpro_limits.robot_position.high,
+        )
 
     def sample_grasp(self, observation, overwrite_z=True):
         curr_pose = {
@@ -156,6 +173,7 @@ class PDControlPolicy:
         assert (
             joint_positions is not None
         ), "position_pd_control(): joint_positions undefined"
+        self.joint_positions = self.clip_to_joint_space(joint_positions)
         current_position = observation["robot_observation"]["position"]
         current_velocity = observation["robot_observation"]["velocity"]
         position_error = joint_positions - current_position
@@ -316,18 +334,18 @@ class PDControlPolicy:
                 observation, desired_position=self.joint_positions
             )
         if mode == "safe":
-            q, dq = (
-                observation["robot_observation"]["position"],
-                observation["robot_observation"]["velocity"],
-            )
-            return pos_control.get_joint_torques(
-                safe_pos.flatten(),
-                self.kinematics.robot_model,
-                self.kinematics.data,
-                q,
-                dq,
-                self.position_control_params,
-            )
+            # q, dq = (
+            #     observation["robot_observation"]["position"],
+            #     observation["robot_observation"]["velocity"],
+            # )
+            # return pos_control.get_joint_torques(
+            #     safe_pos.flatten(),
+            #     self.kinematics.robot_model,
+            #     self.kinematics.data,
+            #     q,
+            #     dq,
+            #     self.position_control_params,
+            # )
             return self.position_pd_control(observation, safe_pos)
         if mode == "pos":
             return self.position_control(observation, grasp_points)
@@ -387,10 +405,13 @@ class PDControlPolicy:
         else:
             self.joint_torques = self.gravity_comp(observation)
 
-        self.joint_torques = self.clip_to_space(self.joint_torques)
+        self.joint_torques = self.clip_to_torque_space(self.joint_torques)
         # make sure to return a copy, not a reference to self.joint_positions
         self._tip_jacobians = []
-        return np.array(self.joint_torques)
+        if self.action_type == "torque":
+            return np.array(self.joint_torques.copy())
+        else:
+            return np.array(self.joint_positions.copy())
 
     @property
     def tip_jacobians(self):
