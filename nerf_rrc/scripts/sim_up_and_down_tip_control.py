@@ -18,7 +18,7 @@ def clip_to_space(action_space, action):
 def main():
     # the goal is passed as JSON string
     goal_json = sys.argv[1]
-    goal = json.loads(goal_json)
+    goal = json.loads(open(goal_json, "r").read())["_goal"]
 
     env = cube_trajectory_env.SimCubeTrajectoryEnv(
         goal,
