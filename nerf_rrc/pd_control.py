@@ -307,64 +307,85 @@ class PDControlPolicy:
         return q
 
     def control(self, mode, observation):
+        tip_positions = np.asarray(
+            self.kinematics.forward_kinematics(
+                observation["robot_observation"]["position"]
+            )
+        ).reshape(3, 3)
         if mode != "up":
             if self.grasp_points is None:
                 self.grasp_points, self.grasp_normals = self.sample_grasp(observation)
-        # safe grasp point moves slightly off of contact surface
-        grasp_points, grasp_normals = self.grasp_points, self.grasp_normals
-        safe_pos = grasp_points - grasp_normals * 0.1
-        safe_pos[:, 2] = 0.05
-        if self.last_mode != mode:
-            tip_positions = np.asarray(
-                self.kinematics.forward_kinematics(
-                    observation["robot_observation"]["position"]
+                # safe grasp point moves slightly off of contact surface
+                finger_assignment = self.compute_finger_assignment(
+                    tip_positions, self.grasp_points
                 )
-            ).reshape(3, 3)
-            finger_assignment = self.compute_finger_assignment(
-                tip_positions, grasp_points
-            )
-            print("safe pos:", safe_pos)
-            print("tip_positions:", tip_positions)
-            print("finger assignment:", [0, 1, 2])
-            print("finger assignment by distance:", finger_assignment)
+                self.grasp_points = self.grasp_points[finger_assignment]
+                self.grasp_normals = self.grasp_normals[finger_assignment]
+                safe_pos = self.grasp_points - self.grasp_normals * 0.1
+                safe_pos[:, 2] = 0.05
+                self.safe_tip_pos_goals = np.linspace(tip_positions, safe_pos, num=5)
+                self.safe_tip_goal_idx = 0
+                self.tip_goal_idx = 0
+                self.tip_pos_goals = np.linspace(safe_pos, self.grasp_points, num=3)
+
+        if mode == "safe":
+            safe_pos = self.safe_tip_pos_goals[self.safe_tip_goal_idx]
+            tip_norm = np.linalg.norm(safe_pos - tip_positions)
+            print(tip_norm)
+            if tip_norm < 0.01:
+                self.safe_tip_goal_idx = min(
+                    len(self.safe_tip_pos_goals) - 1, self.safe_tip_goal_idx + 1
+                )
+            return self.position_pd_control(observation, safe_pos)
+        if mode == "ik":
+            safe_pos = self.tip_pos_goals[self.tip_goal_idx]
+            tip_norm = np.linalg.norm(safe_pos - tip_positions)
+            print(tip_norm)
+            if tip_norm < 0.01:
+                self.tip_goal_idx = min(
+                    len(self.tip_pos_goals) - 1, self.tip_goal_idx + 1
+                )
+            return self.position_pd_control(observation, safe_pos)
+
+        # if self.last_mode != mode:
+        #     print("safe pos:", safe_pos)
+        #     print("tip_positions:", tip_positions)
+        #     print("finger assignment:", [0, 1, 2])
 
         self.last_mode = mode
         if mode == "off":
             return self.position_pd_control(
                 observation, desired_position=self.joint_positions
             )
-        if mode == "safe":
-            # q, dq = (
-            #     observation["robot_observation"]["position"],
-            #     observation["robot_observation"]["velocity"],
-            # )
-            # return pos_control.get_joint_torques(
-            #     safe_pos.flatten(),
-            #     self.kinematics.robot_model,
-            #     self.kinematics.data,
-            #     q,
-            #     dq,
-            #     self.position_control_params,
-            # )
-            return self.position_pd_control(observation, safe_pos)
+        # if mode == "safe":
+        # q, dq = (
+        #     observation["robot_observation"]["position"],
+        #     observation["robot_observation"]["velocity"],
+        # )
+        # return pos_control.get_joint_torques(
+        #     safe_pos.flatten(),
+        #     self.kinematics.robot_model,
+        #     self.kinematics.data,
+        #     q,
+        #     dq,
+        #     self.position_control_params,
+        # )
         if mode == "pos":
-            return self.position_control(observation, grasp_points)
+            return self.position_control(observation, self.grasp_points)
         if mode == "vel":
             # move radially in along xy plane
             return self.vel_control_force_limit(
-                observation, grasp_points, grasp_normals
+                observation, self.grasp_points, self.grasp_normals
             )
-        if mode == "ik":
-            return self.position_pd_control(observation, grasp_points)
         if mode == "up":
             # TODO: Add nerf
             # if self.use_grad_est:
             # in_normals = self.get_grad_ests(grasp_points, grasp_normals)
             # else:
-            in_normals = grasp_normals
+            in_normals = self.grasp_normals
             target_pos = observation["desired_goal"]
             return self.object_pos_control(
-                observation, grasp_points, in_normals, target_pos
+                observation, self.grasp_points, in_normals, target_pos
             )
 
     def gravity_comp(self, observation):
@@ -440,9 +461,9 @@ class PDControlPolicy:
         if t < 0:
             # fingers need to compensate for gravity and hold tip positions:
             mode = "off"  # Box needs this to get ot graps position
-        elif t < 1500:
+        elif t < 2000:
             mode = "safe"
-        elif t < 1000:
+        elif t < 2300:
             mode = "ik"
         else:
             mode = "up"
