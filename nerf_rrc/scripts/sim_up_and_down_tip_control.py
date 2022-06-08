@@ -26,7 +26,9 @@ def main():
         step_size=1,
     )
     control_params = pos_control.PosControlConfig(
-        Kp=20.0, Kd=[0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5], damping=1e-12
+        Kp=100.0,
+        Kd=[x * 10 for x in [0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5]],
+        damping=1e-12,
     )
 
     policy = PDControlPolicy(env.action_space, goal, control_params)

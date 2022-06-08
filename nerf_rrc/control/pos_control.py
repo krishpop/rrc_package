@@ -64,7 +64,7 @@ def get_joint_torques(p_des, model, data, q, dq, config):
         Kd = np.array(Kd)
     a_des = config.Kp * (p_des - p_curr) - config.Kd * v_curr
 
-    # print(np.linalg.norm(p_des - p_curr))
+    print(np.linalg.norm(p_des - p_curr))
     ddq_des = np.linalg.inv(J.T @ J + config.damping * np.eye(9)) @ J.T @ a_des
 
     # Compute mass matrix + feedforward term for control.

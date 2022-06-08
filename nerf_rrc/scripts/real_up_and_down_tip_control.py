@@ -39,19 +39,27 @@ def main():
         kin.forward_kinematics(observation["robot_observation"]["position"])
     ).flatten()
     min_height, max_height = 0.05, 0.1
-    while not is_done:
-        if t % 100:
-            print(f"iteration {t}")
-        h = 0.5 * (1 + np.sin(np.pi / 500 * t)) * (max_height - min_height) + min_height
-        tip_pos = orig_tp.copy()
-        tip_pos[2::3] = h
+    while t < 4000:
+        h = (
+            0.5 * (1 + np.sin(np.pi / 1000 * t)) * (max_height - min_height)
+            + min_height
+        )
+        des_tip_pos = orig_tp.copy()
+        des_tip_pos[2::3] = h
         obs = observation["robot_observation"]
         q, dq = obs["position"], obs["velocity"]
         action = pos_control.get_joint_torques(
-            tip_pos, kin.robot_model, kin.data, q, dq, control_params
+            des_tip_pos, kin.robot_model, kin.data, q, dq, control_params
         )
         action = clip_to_space(env.action_space, action)
 
         observation, reward, is_done, info = env.step(action)
+        obs = observation["robot_observation"]
+        tip_pos = np.asarray(kin.forward_kinematics(obs["position"])).flatten()
+        tip_dist = np.linalg.norm(des_tip_pos - tip_pos)
+        if t % 100 == 0:
+            print(f"iteration {t}")
+            print("reward:", reward)
+            print("tip dist:", tip_dist)
         t = info["time_index"]
-        print("reward:", reward)
+    assert False, f"End of Episode, iteration {t}"
