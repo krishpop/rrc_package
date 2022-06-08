@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# run the script via `ros2 run` (for python scripts a simple symlink would also
+# work but using `ros2 run` works for C++ executables as well)
+
+# Examples for Stage 1
+# ros2 run nerf_rrc real_move_up_and_down "$@"
+ros2 run nerf_rrc sim_up_and_down_tip_control "$@"
+
+# Example for Stage 2
+# ros2 run nerf_rrc dice_example_with_gym "$@"

@@ -18,17 +18,24 @@ def clip_to_space(action_space, action):
 def main():
     # the goal is passed as JSON string
     goal_json = sys.argv[1]
+    if len(sys.argv) == 4:
+        kp = float(sys.argv[2])
+        kd = float(sys.argv[3])
+        control_params = pos_control.PosControlConfig(
+            Kp=kp,
+            Kd=kd,
+            damping=1e-12,
+        )
+    elif len(sys.argv) == 3:
+        control_params = pos_control.load_config(sys.argv[2])
+    else:
+        assert False, "len of sys.argv was: {}".format(len(sys.argv))
     goal = json.loads(open(goal_json, "r").read())["_goal"]
 
     env = cube_trajectory_env.SimCubeTrajectoryEnv(
         goal,
         cube_trajectory_env.ActionType.TORQUE,
         step_size=1,
-    )
-    control_params = pos_control.PosControlConfig(
-        Kp=100.0,
-        Kd=[x * 10 for x in [0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5]],
-        damping=1e-12,
     )
 
     policy = PDControlPolicy(env.action_space, goal, control_params)
@@ -41,19 +48,28 @@ def main():
         kin.forward_kinematics(observation["robot_observation"]["position"])
     ).flatten()
     min_height, max_height = 0.05, 0.1
-    while not is_done:
-        if t % 100:
-            print(f"iteration {t}")
+    tip_dists = []
+    while t < 2000:
         h = 0.5 * (1 + np.sin(np.pi / 500 * t)) * (max_height - min_height) + min_height
-        tip_pos = orig_tp.copy()
-        tip_pos[2::3] = h
+        des_tip_pos = orig_tp.copy()
+        des_tip_pos[2::3] = h
         obs = observation["robot_observation"]
         q, dq = obs["position"], obs["velocity"]
         action = pos_control.get_joint_torques(
-            tip_pos, kin.robot_model, kin.data, q, dq, control_params
+            des_tip_pos, kin.robot_model, kin.data, q, dq, control_params
         )
         action = clip_to_space(env.action_space, action)
 
         observation, reward, is_done, info = env.step(action)
+        obs = observation["robot_observation"]
+        tip_pos = np.asarray(kin.forward_kinematics(obs["position"])).flatten()
+        tip_dist = np.linalg.norm(des_tip_pos - tip_pos)
+        tip_dists.append(tip_dist)
+        if t % 100 == 0:
+            print(f"iteration {t}")
+            print("reward:", reward)
+            print("tip dist:", tip_dist)
         t = info["time_index"]
-        print("reward:", reward)
+
+    print("Mean tip dist:", np.mean(tip_dists))
+    print("Min tip dist:", np.min(tip_dists))
